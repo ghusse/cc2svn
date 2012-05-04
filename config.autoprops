@@ -1,0 +1,37 @@
+*.bat = svn:eol-style=CRLF;svn:executable
+*.c = svn:eol-style=LF
+*.cpp = svn:eol-style=native
+*.css =	svn:mime-type=text/css
+*.doc = svn:mime-type=application/msword;svn:needs-lock=yes
+*.dsp = svn:eol-style=CRLF
+*.dsw = svn:eol-style=CRLF
+*.er1 = svn:needs-lock=yes
+*.fmb = svn:needs-lock=yes
+*.fmt = svn:keywords="Id Rev Date Author URL";svn:needs-lock=yes
+*.gif = svn:mime-type=image/gif
+*.gz = svn:mime-type=application/x-gzip
+*.h = svn:eol-style=LF
+*.html = svn:mime-type=text/html
+*.htm = svn:mime-type=text/html
+*.java = svn:eol-style=native
+*.jpeg = svn:mime-type=image/jpeg;svn:needs-lock=yes
+*.jpg = svn:mime-type=image/jpeg;svn:needs-lock=yes
+*.js = svn:mime-type=application/x-javascript
+Makefile = svn:eol-style=native
+*.pdf = svn:mime-type=application/pdf;svn:needs-lock=yes
+*.png = svn:mime-type=image/png
+*.pps = svn:mime-type=application/vnd.ms-powerpoint;svn:needs-lock=yes
+*.ppt = svn:mime-type=application/vnd.ms-powerpoint;svn:needs-lock=yes
+*.ps = svn:mime-type=application/postscript
+*.py = svn:eol-style=native
+*.rtf = svn:mime-type=application/rtf
+*.sh = svn:keywords="Id Rev Date Author URL";svn:eol-style=LF;svn:executable
+*.tar = svn:mime-type=application/x-tar
+*.tcl = svn:eol-style=native
+*.tgz = svn:mime-type=application/x-gzip
+*.tiff = svn:mime-type=image/tiff
+*.txt = svn:eol-style=native
+*.xls = svn:mime-type=application/vnd.ms-excel;svn:needs-lock=yes
+*.xml = svn:mime-type=text/xml
+*.zip = svn:mime-type=application/zip
+
