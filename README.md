@@ -12,14 +12,14 @@ cc2svn tool converts ClearCase view files with all history and given labels to S
 The dump can be loaded by SVN using 'cat svndump.txt | svnadmin load' command.
 Features:
 
-    transfers history of changes for files saving the date, author and comment for each revision
-    converts all/some/none branches (configurable)
-    converts all/some/none labels (configurable)
-	__allows to filter imported directories__
-    incremental dump mode
-    retry/ignore failed CC commands
-    cache for ClearCase files
-    tested on Linux/Solaris and __Windows__
+ - transfers history of changes for files saving the date, author and comment for each revision
+ - converts all/some/none branches (configurable)
+ - converts all/some/none labels (configurable)
+ - __allows to filter imported directories__
+ - incremental dump mode
+ - retry/ignore failed CC commands
+ - cache for ClearCase files
+ - tested on Linux/Solaris and __Windows__
 
 Main points
 -----------
