@@ -45,6 +45,11 @@ CC_LABELS_FILE = THIS_FILE_DIR + "/labels.txt"
 # user_dev
 CC_BRANCHES_FILE = THIS_FILE_DIR + "/branches.txt"
 
+
+# If CC_IGNORED_DIRECTORIES_FILE is not defined, the tool will not import history of files
+# from ignored directories
+CC_IGNORED_DIRECTORIES_FILE = THIS_FILE_DIR + "/ignoredDirectories.txt"
+
 # If the tool finds the size of the file in cache is zero, it may try loading the file from ClearCase again.
 # This is to make sure zero size is not due to previous unsuccessful retrieving attempt.
 CHECK_ZEROSIZE_CACHEFILE = True
@@ -67,3 +72,5 @@ HISTORY_FILE = "cchistory.txt"
 # Date format is YYYYMMDD.hhmmss (the same as CC is using).  
 #DUMP_SINCE_DATE = "20010921.175059"
 
+# Encoding of the history file
+ENCODING = "Windows-1252"

@@ -98,7 +98,7 @@ if sys.argv[1] != "-run":
     
 HISTORY_FIELD_SEPARATOR = "@@@"    
 
-HISTORY_FORMAT = "%Nd;%En;%Vn;%o;%l;%a;%m;%u;%Nc;\n".replace(";", HISTORY_FIELD_SEPARATOR)    
+HISTORY_FORMAT = "%Nd;%En;%Vn;%o;%l;%a;%m;%u;%Nc;\\n".replace(";", HISTORY_FIELD_SEPARATOR)    
 
 CC_DATE_FORMAT = "%Y%m%d.%H%M%S"
 SVN_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000000Z"
@@ -112,7 +112,7 @@ DUMP_SINCE_DATE = None
 
 from config import *
 
-CLEARTOOL = os.path.realpath(CLEARTOOL)
+CLEARTOOL = '"' + os.path.realpath(CLEARTOOL) + '"'
 CC_VOB_DIR = os.path.realpath(CC_VOB_DIR)
 CACHE_DIR = os.path.realpath(CACHE_DIR)
 SVN_AUTOPROPS_FILE = os.path.realpath(SVN_AUTOPROPS_FILE)
@@ -156,7 +156,7 @@ def shellCmd(cmd, cwd=None, outfile=None):
                 outfd = open(outfile, 'wb')
             if cwd and not os.path.exists(cwd):
                 raise RuntimeError("No such file or directory: '" + cwd + "'")
-            p = subprocess.Popen(cmd, cwd=cwd, stdout=outfd, stderr=subprocess.PIPE, shell=True, close_fds=True)
+            p = subprocess.Popen(cmd, cwd=cwd, stdout=outfd, stderr=subprocess.PIPE, shell=True, close_fds=False)
             (outStr, errStr) = p.communicate()
             if outfile:
                 outfd.close()
@@ -194,7 +194,10 @@ def askYesNo(question):
         if answer == "n": return False
 
 def toUTF8(text):
-    return codecs.utf_8_encode(text)[0]
+    unicode_str = text.decode(ENCODING)
+    return unicode_str.encode("utf8")
+
+    #return codecs.utf_8_encode(text)[0]
 
 def rblocks(f, blocksize=4096):
     """Read file as series of blocks from end of file to start.
@@ -339,8 +342,9 @@ class CCHistoryParser:
         self.prevline = ""
         
         # 20090729.162424;path/to/dir;/main/branch/another/1;checkin;(LABEL_1, LABEL2);;directory version;user1;Added file element file.cpp;
-        
+
         ccRecord = CCRecord()
+        ccRecord.comment = fields[8];
         ccRecord.date = time.strptime(fields[0], CC_DATE_FORMAT)
         ccRecord.path = os.path.normpath(fields[1]);
         ccRecord.revision = fields[2];
@@ -348,9 +352,14 @@ class CCHistoryParser:
         ccRecord.labels = self.parseLabels(fields[4]);
         ccRecord.type = fields[6];
         ccRecord.author = fields[7];
-        ccRecord.comment = fields[8];
         
-        revisionParts = ccRecord.revision.split('/')
+        tags = self.parseLabels(fields[5])
+        
+        for tag in tags:
+            ccRecord.comment += "\n" + tag
+        
+        revisionParts = ccRecord.revision.split(os.sep)
+        
         if len(revisionParts) > 0:
             ccRecord.branchNames = revisionParts[1:-1]
             ccRecord.revNumber = revisionParts[-1]
@@ -366,7 +375,7 @@ def writeTextContentLength(out, len):
     out.write("Text-content-length: " + str(len) + "\n");
 
 def writeNodePath(out, nodePath):
-    out.write("Node-path: " + nodePath + "\n");
+    out.write("Node-path: " + toUTF8(str.replace(nodePath, '\\', '/')) + "\n");
 
 def writeNodeKind(out, nodeKind):
     out.write("Node-kind: " + nodeKind + "\n");
@@ -419,7 +428,7 @@ def dumpSvnCopy(out, kind, copyfromPath, copyfromRev, target):
     writeNodeKind(out, kind);
     writeNodeAction(out, "add");
     out.write("Node-copyfrom-rev: " + str(copyfromRev) + "\n");    
-    out.write("Node-copyfrom-path: " + toUTF8(copyfromPath) + "\n");
+    out.write("Node-copyfrom-path: " + toUTF8(str.replace(copyfromPath, '\\', '/')) + "\n");
     out.write("\n");        
         
 def dumpSvnDir(out, path):
@@ -495,7 +504,7 @@ class WriteStream:
     
                
 class Converter:
-    def __init__(self, dumpfile, labels, branches, autoProps):
+    def __init__(self, dumpfile, labels, branches, ignoredDirectories, autoProps):
         self.autoProps = autoProps        
         self.labels = labels                
         if self.labels is not None:
@@ -503,6 +512,7 @@ class Converter:
         else:
             self.checklabels = set()    
         self.branches = branches
+        self.ignoredDirectories = ignoredDirectories
         self.out = WriteStream(dumpfile)
         
         self.svnTree = {} # branch/label -> FileSet
@@ -580,6 +590,17 @@ class Converter:
                 if self.labels is None and updateLabels:
                     self.checklabels.add(cclabel) # will be used in completeLabels phase
         pass
+    
+    def isIgnored(self, path):
+        if self.ignoredDirectories is None:
+            return False
+         
+        for directory in self.ignoredDirectories:
+            if path.startswith(directory):
+                info("ignored :" + path);
+                return True
+        
+        return False
         
     def process(self, ccRecord):
         #    OPERATION;TYPE
@@ -609,11 +630,14 @@ class Converter:
         ccRecord.svnpath = getSvnBranchPath(ccRecord.svnbranch) + "/" + ccRecord.path
         
         if self.branches is not None and ccRecord.svnbranch not in self.branches:
-            return            
-                
+            return
+
+        if self.isIgnored(ccRecord.path):
+            return
+
         if DUMP_SINCE_DATE is not None and self.out.disabled() and ccRecord.date > DUMP_SINCE_DATE:
             self.out.enable()
-            
+
         self.setRevisionProps(ccRecord)
         
         if type == "version": # file
@@ -740,6 +764,9 @@ class Converter:
     
     def getFile(self, path, revision, symlink=False):
         ccfile = path
+        
+        info(path + " " + revision)
+        
         localfile = os.path.normpath(self.cachedir + "/" + path)
         if revision: 
             ccfile = ccfile + "@@" + revision
@@ -764,7 +791,7 @@ class Converter:
                 else:
                     raise RuntimeError("File " + symlinkfile + " is not a symbolic link")
             else: 
-                cmd = CLEARTOOL + " get -to '" + localfile + "' '" + ccfile + "'"
+                cmd = CLEARTOOL + ' get -to "' + localfile + '" "' + ccfile + '"'
                 (status, out) = shellCmd(cmd, cwd=CC_VOB_DIR)
                 if status == "ignore":
                     if not os.path.exists(localfile): open(localfile, 'w').close()
@@ -784,7 +811,7 @@ class Converter:
                 for line in file:
                     outStr += line
         else:
-            cmd = CLEARTOOL + " descr -fmt '" + HISTORY_FORMAT + "' " + ccrevfile
+            cmd = CLEARTOOL + ' descr -fmt "' + HISTORY_FORMAT + '" ' + ccrevfile
             (status, outStr) = shellCmd(cmd, cwd=CC_VOB_DIR)
             with open(localfile, 'w') as file:
                 file.write(outStr)                    
@@ -793,22 +820,23 @@ class Converter:
     def getLabelContent(self, label):       
         labelFilename = os.path.join(CACHE_DIR, label)
         if not os.path.exists(labelFilename):
-            cmd = CLEARTOOL + " find . -ver 'version(" + label + ")' -print"
+            cmd = CLEARTOOL + ' find . -ver "version(' + label + ')" -print'
             shellCmd(cmd, cwd=CC_VOB_DIR, outfile=labelFilename)
         return labelFilename
     
     
     def saveConfigSpec(self, file):                
         cmd = CLEARTOOL + " catcs"        
-        shellCmd(cmd, outfile=file)
+        shellCmd(cmd, cwd=CC_VOB_DIR, outfile=file)
             
     def setConfigSpec(self, file):
-        cmd = CLEARTOOL + " setcs " + file        
-        shellCmd(cmd)
+        cmd = CLEARTOOL + " setcs -def " + file        
+        shellCmd(cmd, cwd=CC_VOB_DIR)
     
     def setLabelSpec(self, label):
         with open(CCVIEW_TMPFILE, 'w') as file:
-                file.write("element * " + label + "\n")        
+            file.write("element * CHECKEDOUT\n")
+            file.write("element * " + label + "\n")
         self.setConfigSpec(CCVIEW_TMPFILE)        
         
     def completeLabels(self):
@@ -820,13 +848,12 @@ class Converter:
         parser = CCHistoryParser()
         ccRecord = CCRecord()
 
-        if self.checklabels:
-            self.saveConfigSpec(CCVIEW_CONFIGSPEC)
+        #if self.checklabels:
+        #    self.saveConfigSpec(CCVIEW_CONFIGSPEC)
             
         for label in self.checklabels:   
-            info("Checking " + label)
                   
-            self.setLabelSpec(label)
+            #self.setLabelSpec(label)
             try:            
                 labelFilename = self.getLabelContent(label)            
                 with open(labelFilename, 'r') as file:            
@@ -840,9 +867,10 @@ class Converter:
                         if path == ".": continue
                         path = os.path.normpath(path)
                         
-                        if (path, revision) not in self.ccTree:   
+                        if (path, revision) not in self.ccTree and not self.isIgnored(path):   
                             details = self.getFileDetails(ccrevfile)
                             ccRecord = parser.processLine(details)
+                            
                             if ccRecord and ccRecord.type == "version": # file   
                                 
                                 if DUMP_SINCE_DATE is not None and ccRecord.date > DUMP_SINCE_DATE:
@@ -870,8 +898,9 @@ class Converter:
             except:
                 error(str(sys.exc_info()[1]))
         
-        if self.checklabels:
-            self.setConfigSpec(CCVIEW_CONFIGSPEC)
+        #if self.checklabels:
+        #    self.setConfigSpec(CCVIEW_CONFIGSPEC)
+        
         pass
 
 ############# main functions ######################
@@ -884,7 +913,7 @@ def getCCHistory(filename):
         if askYesNo("Use this file?"):
             return filename        
     
-    cmd = CLEARTOOL + " lshistory -recurse -fmt '" + HISTORY_FORMAT + "'"
+    cmd = CLEARTOOL + " lshistory -recurse -fmt " + HISTORY_FORMAT
     shellCmd(cmd, cwd=CC_VOB_DIR, outfile=filename)
     pass
 
@@ -903,8 +932,8 @@ def main():
     try:
     
         labels = readList(CC_LABELS_FILE)
-        
         branches = readList(CC_BRANCHES_FILE)
+        ignoredDirectories = readList(CC_IGNORED_DIRECTORIES_FILE)
     
         getCCHistory(HISTORY_FILE)
         
@@ -914,13 +943,14 @@ def main():
     
         with open(SVN_DUMP_FILE, 'wb') as dumpfile:
         
-            converter = Converter(dumpfile, labels, branches, autoProps)
+            converter = Converter(dumpfile, labels, branches, ignoredDirectories, autoProps)
             
             parser = CCHistoryParser()
             
             with open(HISTORY_FILE, 'rb') as historyFile: 
                 for line in rlines(historyFile): # reading lines in reverse order
                     ccRecord = parser.processLine(line)
+
                     if ccRecord:
                         converter.process(ccRecord)
             
